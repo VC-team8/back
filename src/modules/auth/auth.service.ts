@@ -61,6 +61,9 @@ export class AuthService {
   async loginUser(loginDto: LoginDto) {
     const user = await this.validateUser(loginDto.email, loginDto.password);
 
+    // Fetch company data for the user
+    const company = await this.companiesService.findOne(user.companyId.toString());
+
     const payload = {
       email: user.email,
       sub: user._id.toString(),
@@ -70,7 +73,10 @@ export class AuthService {
 
     return {
       access_token: this.jwtService.sign(payload),
-      user,
+      user: {
+        ...user,
+        company,
+      },
     };
   }
 }

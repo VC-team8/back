@@ -10,22 +10,17 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Res,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { ResourcesService } from './resources.service';
 import { UploadResourceDto, AddUrlResourceDto } from './dto/upload-resource.dto';
 import { Resource } from './resource.interface';
-import { appConfig } from '../../config/app.config';
-import { diskStorage } from 'multer';
+import { Response } from 'express';
+import { memoryStorage } from 'multer';
 
-const storage = diskStorage({
-  destination: appConfig.uploadPath,
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, file.fieldname + '-' + uniqueSuffix);
-  },
-});
+const storage = memoryStorage();
 
 @ApiTags('Resources')
 @Controller('resources')
@@ -79,6 +74,13 @@ export class ResourcesController {
     return this.resourcesService.addUrlResource(addUrlResourceDto);
   }
 
+  @Get()
+  @ApiOperation({ summary: 'Get all resources' })
+  @ApiResponse({ status: 200, description: 'List of all resources' })
+  async findAll(): Promise<Resource[]> {
+    return this.resourcesService.findAll();
+  }
+
   @Get('companies/:companyId')
   @ApiOperation({ summary: 'Get resources by company ID' })
   @ApiParam({ name: 'companyId', description: 'Company ID' })
@@ -105,5 +107,26 @@ export class ResourcesController {
   async remove(@Param('id') id: string): Promise<{ message: string }> {
     await this.resourcesService.remove(id);
     return { message: 'Resource deleted successfully' };
+  }
+
+  @Get(':id/download')
+  @ApiOperation({ summary: 'Download file from resource' })
+  @ApiParam({ name: 'id', description: 'Resource ID' })
+  @ApiResponse({ status: 200, description: 'File downloaded successfully' })
+  @ApiResponse({ status: 404, description: 'Resource not found or not a file' })
+  async downloadFile(@Param('id') id: string, @Res() res: Response): Promise<void> {
+    const resource = await this.resourcesService.findOne(id);
+
+    if (resource.type !== 'file' || !resource.fileData) {
+      throw new BadRequestException('Resource is not a file or file data not found');
+    }
+
+    res.set({
+      'Content-Type': resource.mimeType || 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${resource.fileName || 'download'}"`,
+      'Content-Length': resource.fileSize || resource.fileData.length,
+    });
+
+    res.send(resource.fileData);
   }
 }

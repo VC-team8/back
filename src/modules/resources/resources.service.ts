@@ -12,6 +12,13 @@ export class ResourcesService {
     private companiesService: CompaniesService,
   ) {}
 
+  async findAll(): Promise<Resource[]> {
+    return this.db
+      .getCollection<Resource>('resources')
+      .find({})
+      .toArray();
+  }
+
   async findAllByCompany(companyId: string): Promise<Resource[]> {
     const companyExists = await this.companiesService.exists(companyId);
     if (!companyExists) {
@@ -62,6 +69,7 @@ export class ResourcesService {
       type: 'url',
       title: addUrlResourceDto.title,
       url: addUrlResourceDto.url,
+      tags: [],
       createdAt: new Date(),
     };
 
@@ -85,7 +93,11 @@ export class ResourcesService {
       companyId: new ObjectId(uploadDto.companyId),
       type: 'file',
       title: uploadDto.title || file.originalname,
-      fileUrl: `/uploads/${file.filename}`,
+      fileName: file.originalname,
+      mimeType: file.mimetype,
+      fileSize: file.size,
+      fileData: file.buffer,
+      tags: [],
       createdAt: new Date(),
     };
 
