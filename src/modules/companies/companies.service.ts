@@ -3,14 +3,20 @@ import { ObjectId } from 'mongodb';
 import { DatabaseService } from '../../database/database.service';
 import { Company } from './company.interface';
 import { CreateCompanyDto } from './dto/create-company.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class CompaniesService {
   constructor(private readonly db: DatabaseService) {}
 
   async create(createCompanyDto: CreateCompanyDto): Promise<Company> {
+    const hashedPassword = createCompanyDto.password
+      ? await bcrypt.hash(createCompanyDto.password, 10)
+      : undefined;
+
     const company: Company = {
       ...createCompanyDto,
+      password: hashedPassword,
       createdAt: new Date(),
     };
 

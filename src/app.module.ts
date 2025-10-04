@@ -15,6 +15,8 @@ import { ResourcesModule } from './modules/resources/resources.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { AiModule } from './modules/ai/ai.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
@@ -26,7 +28,9 @@ import { AiModule } from './modules/ai/ai.module';
       rootPath: join(__dirname, '..', 'uploads'),
       serveRoot: '/uploads',
     }),
+    AuthModule,
     CompaniesModule,
+    UsersModule,
     ResourcesModule,
     ConversationsModule,
     MessagesModule,

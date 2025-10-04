@@ -7,5 +7,6 @@ export interface Company {
   size: string;
   contactName: string;
   email: string;
+  password?: string;
   createdAt: Date;
 }
