@@ -81,7 +81,7 @@ export class ResourcesController {
     return this.resourcesService.findAll();
   }
 
-  @Get('companies/:companyId')
+  @Get('company/:companyId')
   @ApiOperation({ summary: 'Get resources by company ID' })
   @ApiParam({ name: 'companyId', description: 'Company ID' })
   @ApiResponse({ status: 200, description: 'List of resources' })

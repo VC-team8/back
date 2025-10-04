@@ -12,7 +12,7 @@ export class ConversationsService {
     private companiesService: CompaniesService,
   ) {}
 
-  async create(createConversationDto: CreateConversationDto): Promise<Conversation> {
+  async create(createConversationDto: CreateConversationDto): Promise<any> {
     const companyExists = await this.companiesService.exists(createConversationDto.companyId);
     if (!companyExists) {
       throw new NotFoundException(`Company with ID ${createConversationDto.companyId} not found`);
@@ -28,23 +28,35 @@ export class ConversationsService {
       .getCollection<Conversation>('conversations')
       .insertOne(conversation);
 
-    return { ...conversation, _id: result.insertedId };
+    return {
+      ...conversation,
+      id: result.insertedId.toString(),
+      _id: result.insertedId.toString(),
+      companyId: createConversationDto.companyId,
+    };
   }
 
-  async findAllByCompany(companyId: string): Promise<Conversation[]> {
+  async findAllByCompany(companyId: string): Promise<any[]> {
     const companyExists = await this.companiesService.exists(companyId);
     if (!companyExists) {
       throw new NotFoundException(`Company with ID ${companyId} not found`);
     }
 
-    return this.db
+    const conversations = await this.db
       .getCollection<Conversation>('conversations')
       .find({ companyId: new ObjectId(companyId) })
       .sort({ createdAt: -1 })
       .toArray();
+
+    return conversations.map(conv => ({
+      ...conv,
+      id: conv._id.toString(),
+      _id: conv._id.toString(),
+      companyId: companyId,
+    }));
   }
 
-  async findOne(id: string): Promise<Conversation> {
+  async findOne(id: string): Promise<any> {
     const conversation = await this.db
       .getCollection<Conversation>('conversations')
       .findOne({ _id: new ObjectId(id) });
@@ -52,7 +64,13 @@ export class ConversationsService {
     if (!conversation) {
       throw new NotFoundException(`Conversation with ID ${id} not found`);
     }
-    return conversation;
+
+    return {
+      ...conversation,
+      id: conversation._id.toString(),
+      _id: conversation._id.toString(),
+      companyId: conversation.companyId.toString(),
+    };
   }
 
   async exists(id: string): Promise<boolean> {

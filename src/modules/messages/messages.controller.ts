@@ -27,7 +27,7 @@ export class MessagesController {
     return this.messagesService.create(createMessageDto);
   }
 
-  @Get('conversations/:conversationId')
+  @Get('conversation/:conversationId')
   @ApiOperation({ summary: 'Get messages by conversation ID' })
   @ApiParam({ name: 'conversationId', description: 'Conversation ID' })
   @ApiResponse({ status: 200, description: 'List of messages' })

@@ -9,7 +9,7 @@ import * as bcrypt from 'bcrypt';
 export class CompaniesService {
   constructor(private readonly db: DatabaseService) {}
 
-  async create(createCompanyDto: CreateCompanyDto): Promise<Company> {
+  async create(createCompanyDto: CreateCompanyDto): Promise<any> {
     const hashedPassword = createCompanyDto.password
       ? await bcrypt.hash(createCompanyDto.password, 10)
       : undefined;
@@ -24,7 +24,13 @@ export class CompaniesService {
       .getCollection<Company>('companies')
       .insertOne(company);
 
-    return { ...company, _id: result.insertedId };
+    // Return with both _id and id for frontend compatibility
+    const { password, ...companyWithoutPassword } = { ...company, _id: result.insertedId };
+    return {
+      ...companyWithoutPassword,
+      id: result.insertedId.toString(),
+      _id: result.insertedId.toString(),
+    };
   }
 
   async findAll(): Promise<Company[]> {
@@ -51,6 +57,37 @@ export class CompaniesService {
       .getCollection<Company>('companies')
       .findOne({ _id: new ObjectId(id) });
     return !!company;
+  }
+
+  async update(id: string, updateData: Partial<CreateCompanyDto>): Promise<Company> {
+    // If password is being updated, hash it
+    if (updateData.password) {
+      updateData.password = await bcrypt.hash(updateData.password, 10);
+    }
+
+    const result = await this.db
+      .getCollection<Company>('companies')
+      .findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        { $set: { ...updateData, updatedAt: new Date() } },
+        { returnDocument: 'after' }
+      );
+
+    if (!result) {
+      throw new NotFoundException(`Company with ID ${id} not found`);
+    }
+
+    return result;
+  }
+
+  async delete(id: string): Promise<void> {
+    const result = await this.db
+      .getCollection<Company>('companies')
+      .deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      throw new NotFoundException(`Company with ID ${id} not found`);
+    }
   }
 }
 

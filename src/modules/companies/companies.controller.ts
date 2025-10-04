@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Delete,
   Body,
   Param,
   ValidationPipe,
@@ -43,24 +45,27 @@ export class CompaniesController {
     return this.companiesService.findOne(id);
   }
 
-  @Get(':id/resources')
-  @ApiOperation({ summary: 'Get company resources' })
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update company' })
   @ApiParam({ name: 'id', description: 'Company ID' })
-  @ApiResponse({ status: 200, description: 'Company resources' })
+  @ApiResponse({ status: 200, description: 'Company updated successfully' })
   @ApiResponse({ status: 404, description: 'Company not found' })
-  async getResources(@Param('id') id: string) {
-    // This will be handled by the resources controller
-    return { message: 'Use /api/companies/:id/resources endpoint' };
+  async update(
+    @Param('id') id: string,
+    @Body() updateData: Partial<CreateCompanyDto>,
+  ): Promise<Company> {
+    return this.companiesService.update(id, updateData);
   }
 
-  @Get(':id/conversations')
-  @ApiOperation({ summary: 'Get company conversations' })
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete company' })
   @ApiParam({ name: 'id', description: 'Company ID' })
-  @ApiResponse({ status: 200, description: 'Company conversations' })
+  @ApiResponse({ status: 200, description: 'Company deleted successfully' })
   @ApiResponse({ status: 404, description: 'Company not found' })
-  async getConversations(@Param('id') id: string) {
-    // This will be handled by the conversations controller
-    return { message: 'Use /api/companies/:id/conversations endpoint' };
+  async delete(@Param('id') id: string): Promise<{ message: string }> {
+    await this.companiesService.delete(id);
+    return { message: 'Company deleted successfully' };
   }
 }
 
