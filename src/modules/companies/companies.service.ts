@@ -1,41 +1,21 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { ObjectId } from 'mongodb';
-import { DatabaseService } from '../../database/database.service';
-import { Company } from './company.interface';
-import { CreateCompanyDto, LoginCompanyDto } from './dto/create-company.dto';
-import * as bcrypt from 'bcrypt';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { ObjectId } from "mongodb";
+import { DatabaseService } from "../../database/database.service";
+import { Company } from "./company.interface";
+import { CreateCompanyDto } from "./dto/create-company.dto";
+import * as bcrypt from "bcrypt";
 
 @Injectable()
 export class CompaniesService {
   constructor(private readonly db: DatabaseService) {}
 
-  async login(loginDto: LoginCompanyDto): Promise<any> {
-    // Find company by email
-    const company = await this.db
-      .getCollection<Company>('companies')
-      .findOne({ email: loginDto.email });
-
-    if (!company) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
-
-    // Verify password
-    if (!company.password) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
-
-    const isPasswordValid = await bcrypt.compare(loginDto.password, company.password);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
-
-    // Remove password from response and add id field
-    const { password, ...companyWithoutPassword } = company as any;
-
+  // Transform MongoDB document to API response
+  private serializeCompany(company: Company): any {
+    const { _id, password, ...rest } = company;
     return {
-      ...companyWithoutPassword,
-      id: company._id.toString(),
-      _id: company._id.toString(),
+      id: _id?.toString(),
+      ...rest,
+      createdAt: company.createdAt.toISOString(),
     };
   }
 
@@ -51,56 +31,57 @@ export class CompaniesService {
     };
 
     const result = await this.db
-      .getCollection<Company>('companies')
+      .getCollection<Company>("companies")
       .insertOne(company);
 
-    // Return with both _id and id for frontend compatibility
-    const { password, ...companyWithoutPassword } = { ...company, _id: result.insertedId };
-    return {
-      ...companyWithoutPassword,
-      id: result.insertedId.toString(),
-      _id: result.insertedId.toString(),
-    };
+    return this.serializeCompany({ ...company, _id: result.insertedId });
   }
 
-  async findAll(): Promise<Company[]> {
-    return this.db.getCollection<Company>('companies').find().toArray();
+  async findAll(): Promise<any[]> {
+    const companies = await this.db
+      .getCollection<Company>("companies")
+      .find()
+      .toArray();
+    return companies.map((c) => this.serializeCompany(c));
   }
 
-  async findOne(id: string): Promise<Company> {
+  async findOne(id: string): Promise<any> {
     const company = await this.db
-      .getCollection<Company>('companies')
+      .getCollection<Company>("companies")
       .findOne({ _id: new ObjectId(id) });
 
     if (!company) {
       throw new NotFoundException(`Company with ID ${id} not found`);
     }
-    return company;
+    return this.serializeCompany(company);
   }
 
   async findByEmail(email: string): Promise<Company | null> {
-    return this.db.getCollection<Company>('companies').findOne({ email });
+    return this.db.getCollection<Company>("companies").findOne({ email });
   }
 
   async exists(id: string): Promise<boolean> {
     const company = await this.db
-      .getCollection<Company>('companies')
+      .getCollection<Company>("companies")
       .findOne({ _id: new ObjectId(id) });
     return !!company;
   }
 
-  async update(id: string, updateData: Partial<CreateCompanyDto>): Promise<Company> {
+  async update(
+    id: string,
+    updateData: Partial<CreateCompanyDto>
+  ): Promise<Company> {
     // If password is being updated, hash it
     if (updateData.password) {
       updateData.password = await bcrypt.hash(updateData.password, 10);
     }
 
     const result = await this.db
-      .getCollection<Company>('companies')
+      .getCollection<Company>("companies")
       .findOneAndUpdate(
         { _id: new ObjectId(id) },
         { $set: { ...updateData, updatedAt: new Date() } },
-        { returnDocument: 'after' }
+        { returnDocument: "after" }
       );
 
     if (!result) {
@@ -112,7 +93,7 @@ export class CompaniesService {
 
   async delete(id: string): Promise<void> {
     const result = await this.db
-      .getCollection<Company>('companies')
+      .getCollection<Company>("companies")
       .deleteOne({ _id: new ObjectId(id) });
 
     if (result.deletedCount === 0) {
@@ -120,4 +101,3 @@ export class CompaniesService {
     }
   }
 }
-
