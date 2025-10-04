@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/Dmytro/vibecoding_hackaton/front/app/register/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,117 +1,99 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Resource, ResourceDocument } from './resource.schema';
-import { CreateResourceDto, UpdateResourceDto, AddUrlResourceDto } from '../../common/dto/resource.dto';
+import { ObjectId } from 'mongodb';
+import { DatabaseService } from '../../database/database.service';
+import { Resource } from './resource.interface';
+import { UploadResourceDto, AddUrlResourceDto } from './dto/upload-resource.dto';
 import { CompaniesService } from '../companies/companies.service';
 
 @Injectable()
 export class ResourcesService {
   constructor(
-    @InjectModel(Resource.name) private resourceModel: Model<ResourceDocument>,
+    private readonly db: DatabaseService,
     private companiesService: CompaniesService,
   ) {}
 
-  async create(createResourceDto: CreateResourceDto): Promise<Resource> {
-    // Verify company exists
-    const companyExists = await this.companiesService.exists(createResourceDto.companyId);
-    if (!companyExists) {
-      throw new NotFoundException(`Company with ID ${createResourceDto.companyId} not found`);
-    }
-
-    const createdResource = new this.resourceModel(createResourceDto);
-    return createdResource.save();
-  }
-
   async findAllByCompany(companyId: string): Promise<Resource[]> {
-    // Verify company exists
     const companyExists = await this.companiesService.exists(companyId);
     if (!companyExists) {
       throw new NotFoundException(`Company with ID ${companyId} not found`);
     }
 
-    return this.resourceModel.find({ companyId }).exec();
+    return this.db
+      .getCollection<Resource>('resources')
+      .find({ companyId: new ObjectId(companyId) })
+      .toArray();
   }
 
   async findOne(id: string): Promise<Resource> {
-    const resource = await this.resourceModel.findById(id).exec();
+    const resource = await this.db
+      .getCollection<Resource>('resources')
+      .findOne({ _id: new ObjectId(id) });
+
     if (!resource) {
       throw new NotFoundException(`Resource with ID ${id} not found`);
     }
     return resource;
   }
 
-  async update(id: string, updateResourceDto: UpdateResourceDto): Promise<Resource> {
-    const updatedResource = await this.resourceModel
-      .findByIdAndUpdate(id, updateResourceDto, { new: true })
-      .exec();
-    
-    if (!updatedResource) {
-      throw new NotFoundException(`Resource with ID ${id} not found`);
-    }
-    
-    return updatedResource;
-  }
-
   async remove(id: string): Promise<void> {
-    const result = await this.resourceModel.findByIdAndDelete(id).exec();
-    if (!result) {
+    const result = await this.db
+      .getCollection<Resource>('resources')
+      .deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
       throw new NotFoundException(`Resource with ID ${id} not found`);
     }
   }
 
   async addUrlResource(addUrlResourceDto: AddUrlResourceDto): Promise<Resource> {
-    // Verify company exists
     const companyExists = await this.companiesService.exists(addUrlResourceDto.companyId);
     if (!companyExists) {
       throw new NotFoundException(`Company with ID ${addUrlResourceDto.companyId} not found`);
     }
 
-    // Validate URL
     try {
       new URL(addUrlResourceDto.url);
     } catch {
       throw new BadRequestException('Invalid URL format');
     }
 
-    const createResourceDto: CreateResourceDto = {
-      companyId: addUrlResourceDto.companyId,
+    const resource: Resource = {
+      companyId: new ObjectId(addUrlResourceDto.companyId),
       type: 'url',
-      title: addUrlResourceDto.title || new URL(addUrlResourceDto.url).hostname,
+      title: addUrlResourceDto.title,
       url: addUrlResourceDto.url,
-      processed: false,
+      createdAt: new Date(),
     };
 
-    return this.create(createResourceDto);
+    const result = await this.db
+      .getCollection<Resource>('resources')
+      .insertOne(resource);
+
+    return { ...resource, _id: result.insertedId };
   }
 
-  async processFile(file: Express.Multer.File, companyId: string): Promise<Resource> {
-    // Verify company exists
-    const companyExists = await this.companiesService.exists(companyId);
+  async uploadFile(
+    file: Express.Multer.File,
+    uploadDto: UploadResourceDto,
+  ): Promise<Resource> {
+    const companyExists = await this.companiesService.exists(uploadDto.companyId);
     if (!companyExists) {
-      throw new NotFoundException(`Company with ID ${companyId} not found`);
+      throw new NotFoundException(`Company with ID ${uploadDto.companyId} not found`);
     }
 
-    const createResourceDto: CreateResourceDto = {
-      companyId,
+    const resource: Resource = {
+      companyId: new ObjectId(uploadDto.companyId),
       type: 'file',
-      title: file.originalname,
+      title: uploadDto.title || file.originalname,
       fileUrl: `/uploads/${file.filename}`,
-      filePath: file.path,
-      fileSize: file.size,
-      mimeType: file.mimetype,
-      processed: false,
+      createdAt: new Date(),
     };
 
-    return this.create(createResourceDto);
-  }
+    const result = await this.db
+      .getCollection<Resource>('resources')
+      .insertOne(resource);
 
-  async markAsProcessed(id: string): Promise<Resource> {
-    return this.update(id, { processed: true });
-  }
-
-  async getUnprocessedResources(): Promise<Resource[]> {
-    return this.resourceModel.find({ processed: false }).exec();
+    return { ...resource, _id: result.insertedId };
   }
 }
 
