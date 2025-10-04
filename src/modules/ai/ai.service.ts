@@ -6,6 +6,9 @@ import OpenAI from 'openai';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { ObjectId } from 'mongodb';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 const SYSTEM_PROMPT = `You are OnboardAI, a friendly and professional assistant designed to help new employees get acquainted with their company. Your personality is helpful, clear, and concise.
 
@@ -55,14 +58,38 @@ export class AiService implements OnModuleInit {
     }
 
     // Only process file types
-    if (resource.type !== 'file' || !resource.fileUrl) {
+    if (resource.type !== 'file' || !resource.fileData) {
       throw new Error('Invalid resource type for file processing');
     }
 
-    // Load document content
-    const loader = new PDFLoader(resource.fileUrl);
-    const docs = await loader.load();
-    const content = docs.map(doc => doc.pageContent).join('\n');
+    let content = '';
+    const fileExtension = path.extname(resource.fileName).toLowerCase();
+
+    // Handle different file types
+    if (fileExtension === '.pdf') {
+      // For PDFs, we need to write to temp file
+      const tempFilePath = path.join(os.tmpdir(), `temp-${resourceId}.pdf`);
+
+      try {
+        // Write buffer to temp file
+        fs.writeFileSync(tempFilePath, resource.fileData);
+
+        // Load PDF
+        const loader = new PDFLoader(tempFilePath);
+        const docs = await loader.load();
+        content = docs.map(doc => doc.pageContent).join('\n');
+      } finally {
+        // Clean up temp file
+        if (fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath);
+        }
+      }
+    } else if (fileExtension === '.md') {
+      // For markdown, just convert buffer to string
+      content = resource.fileData.toString('utf-8');
+    } else {
+      throw new Error(`Unsupported file type: ${fileExtension}. Only PDF and MD files are supported.`);
+    }
 
     // Chunk the text
     const splitter = new RecursiveCharacterTextSplitter({

@@ -11,6 +11,8 @@ import {
   UploadedFile,
   BadRequestException,
   Res,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiConsumes, ApiBody } from '@nestjs/swagger';
@@ -19,6 +21,7 @@ import { UploadResourceDto, AddUrlResourceDto } from './dto/upload-resource.dto'
 import { Resource } from './resource.interface';
 import { Response } from 'express';
 import { memoryStorage } from 'multer';
+import { AiService } from '../ai/ai.service';
 
 const storage = memoryStorage();
 
@@ -26,7 +29,11 @@ const storage = memoryStorage();
 @Controller('resources')
 @UsePipes(new ValidationPipe({ transform: true }))
 export class ResourcesController {
-  constructor(private readonly resourcesService: ResourcesService) {}
+  constructor(
+    private readonly resourcesService: ResourcesService,
+    @Inject(forwardRef(() => AiService))
+    private readonly aiService: AiService,
+  ) {}
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file', { storage }))
@@ -62,7 +69,27 @@ export class ResourcesController {
       throw new BadRequestException('No file uploaded');
     }
 
-    return this.resourcesService.uploadFile(file, uploadDto);
+    // Validate file type
+    const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
+    const supportedExtensions = ['pdf', 'md', 'txt', 'doc', 'docx'];
+
+    if (!fileExtension || !supportedExtensions.includes(fileExtension)) {
+      throw new BadRequestException(
+        `Unsupported file type. Supported types: ${supportedExtensions.join(', ')}`
+      );
+    }
+
+    const resource = await this.resourcesService.uploadFile(file, uploadDto);
+
+    // Automatically process file for embeddings (async, fire-and-forget)
+    // Only process PDF and MD files (we can add more later)
+    if (fileExtension === 'pdf' || fileExtension === 'md') {
+      this.aiService.processFile(resource.id).catch(err => {
+        console.error(`Failed to process file ${resource.id}:`, err);
+      });
+    }
+
+    return resource;
   }
 
   @Post('url')

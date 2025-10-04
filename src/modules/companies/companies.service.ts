@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { ObjectId } from "mongodb";
 import { DatabaseService } from "../../database/database.service";
 import { Company } from "./company.interface";
-import { CreateCompanyDto } from "./dto/create-company.dto";
+import { CreateCompanyDto, LoginCompanyDto } from "./dto/create-company.dto";
 import * as bcrypt from "bcrypt";
 
 @Injectable()
@@ -35,6 +35,24 @@ export class CompaniesService {
       .insertOne(company);
 
     return this.serializeCompany({ ...company, _id: result.insertedId });
+  }
+
+  async login(loginDto: LoginCompanyDto): Promise<any> {
+    const company = await this.findByEmail(loginDto.email);
+
+    if (!company) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Check password
+    const isPasswordValid = await bcrypt.compare(loginDto.password, company.password || '');
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Return company without password
+    return this.serializeCompany(company);
   }
 
   async findAll(): Promise<any[]> {
