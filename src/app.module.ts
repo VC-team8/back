@@ -17,6 +17,7 @@ import { MessagesModule } from './modules/messages/messages.module';
 import { AiModule } from './modules/ai/ai.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { EmployeesModule } from './modules/employees/employees.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { UsersModule } from './modules/users/users.module';
     AuthModule,
     CompaniesModule,
     UsersModule,
+    EmployeesModule,
     ResourcesModule,
     ConversationsModule,
     MessagesModule,

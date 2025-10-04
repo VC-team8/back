@@ -1,0 +1,29 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🚀 Running pre-push checks..."
+echo ""
+
+# Check if MongoDB is running
+echo "📦 Checking MongoDB connection..."
+if ! curl -s http://localhost:27017 > /dev/null 2>&1; then
+    echo "❌ MongoDB is not running!"
+    echo "Please start MongoDB before pushing."
+    exit 1
+fi
+echo "✅ MongoDB is running"
+echo ""
+
+# Run full test suite with coverage
+echo "🧪 Running full test suite with coverage..."
+cd back && npm run test:e2e -- --coverage
+if [ $? -ne 0 ]; then
+    echo "❌ Tests failed. Please fix failing tests before pushing."
+    exit 1
+fi
+echo "✅ All tests passed with coverage"
+echo ""
+
+echo "✨ Pre-push checks completed successfully!"
+echo "📤 Pushing to remote..."
+

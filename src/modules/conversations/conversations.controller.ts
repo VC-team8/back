@@ -27,7 +27,7 @@ export class ConversationsController {
     return this.conversationsService.create(createConversationDto);
   }
 
-  @Get('companies/:companyId')
+  @Get('company/:companyId')
   @ApiOperation({ summary: 'Get conversations by company ID' })
   @ApiParam({ name: 'companyId', description: 'Company ID' })
   @ApiResponse({ status: 200, description: 'List of conversations' })
@@ -45,14 +45,5 @@ export class ConversationsController {
     return this.conversationsService.findOne(id);
   }
 
-  @Get(':id/messages')
-  @ApiOperation({ summary: 'Get messages by conversation ID' })
-  @ApiParam({ name: 'id', description: 'Conversation ID' })
-  @ApiResponse({ status: 200, description: 'List of messages' })
-  @ApiResponse({ status: 404, description: 'Conversation not found' })
-  async getMessages(@Param('id') id: string) {
-    // This will be handled by the messages controller
-    return { message: 'Use /api/conversations/:id/messages endpoint' };
-  }
 }
 

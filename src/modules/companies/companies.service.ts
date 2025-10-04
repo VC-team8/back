@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { ObjectId } from 'mongodb';
-import { DatabaseService } from '../../database/database.service';
-import { Company } from './company.interface';
-import { CreateCompanyDto } from './dto/create-company.dto';
-import * as bcrypt from 'bcrypt';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { ObjectId } from "mongodb";
+import { DatabaseService } from "../../database/database.service";
+import { Company } from "./company.interface";
+import { CreateCompanyDto } from "./dto/create-company.dto";
+import * as bcrypt from "bcrypt";
 
 @Injectable()
 export class CompaniesService {
@@ -31,20 +31,23 @@ export class CompaniesService {
     };
 
     const result = await this.db
-      .getCollection<Company>('companies')
+      .getCollection<Company>("companies")
       .insertOne(company);
 
     return this.serializeCompany({ ...company, _id: result.insertedId });
   }
 
   async findAll(): Promise<any[]> {
-    const companies = await this.db.getCollection<Company>('companies').find().toArray();
-    return companies.map(c => this.serializeCompany(c));
+    const companies = await this.db
+      .getCollection<Company>("companies")
+      .find()
+      .toArray();
+    return companies.map((c) => this.serializeCompany(c));
   }
 
   async findOne(id: string): Promise<any> {
     const company = await this.db
-      .getCollection<Company>('companies')
+      .getCollection<Company>("companies")
       .findOne({ _id: new ObjectId(id) });
 
     if (!company) {
@@ -54,14 +57,47 @@ export class CompaniesService {
   }
 
   async findByEmail(email: string): Promise<Company | null> {
-    return this.db.getCollection<Company>('companies').findOne({ email });
+    return this.db.getCollection<Company>("companies").findOne({ email });
   }
 
   async exists(id: string): Promise<boolean> {
     const company = await this.db
-      .getCollection<Company>('companies')
+      .getCollection<Company>("companies")
       .findOne({ _id: new ObjectId(id) });
     return !!company;
   }
-}
 
+  async update(
+    id: string,
+    updateData: Partial<CreateCompanyDto>
+  ): Promise<Company> {
+    // If password is being updated, hash it
+    if (updateData.password) {
+      updateData.password = await bcrypt.hash(updateData.password, 10);
+    }
+
+    const result = await this.db
+      .getCollection<Company>("companies")
+      .findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        { $set: { ...updateData, updatedAt: new Date() } },
+        { returnDocument: "after" }
+      );
+
+    if (!result) {
+      throw new NotFoundException(`Company with ID ${id} not found`);
+    }
+
+    return result;
+  }
+
+  async delete(id: string): Promise<void> {
+    const result = await this.db
+      .getCollection<Company>("companies")
+      .deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      throw new NotFoundException(`Company with ID ${id} not found`);
+    }
+  }
+}

@@ -12,26 +12,42 @@ export class ResourcesService {
     private companiesService: CompaniesService,
   ) {}
 
-  async findAll(): Promise<Resource[]> {
-    return this.db
+  async findAll(): Promise<any[]> {
+    const resources = await this.db
       .getCollection<Resource>('resources')
       .find({})
       .toArray();
+
+    return resources.map(res => ({
+      ...res,
+      id: res._id.toString(),
+      _id: res._id.toString(),
+      companyId: res.companyId.toString(),
+      fileData: undefined, // Don't send binary data in list
+    }));
   }
 
-  async findAllByCompany(companyId: string): Promise<Resource[]> {
+  async findAllByCompany(companyId: string): Promise<any[]> {
     const companyExists = await this.companiesService.exists(companyId);
     if (!companyExists) {
       throw new NotFoundException(`Company with ID ${companyId} not found`);
     }
 
-    return this.db
+    const resources = await this.db
       .getCollection<Resource>('resources')
       .find({ companyId: new ObjectId(companyId) })
       .toArray();
+
+    return resources.map(res => ({
+      ...res,
+      id: res._id.toString(),
+      _id: res._id.toString(),
+      companyId: companyId,
+      fileData: undefined, // Don't send binary data in list
+    }));
   }
 
-  async findOne(id: string): Promise<Resource> {
+  async findOne(id: string): Promise<any> {
     const resource = await this.db
       .getCollection<Resource>('resources')
       .findOne({ _id: new ObjectId(id) });
@@ -39,7 +55,13 @@ export class ResourcesService {
     if (!resource) {
       throw new NotFoundException(`Resource with ID ${id} not found`);
     }
-    return resource;
+
+    return {
+      ...resource,
+      id: resource._id.toString(),
+      _id: resource._id.toString(),
+      companyId: resource.companyId.toString(),
+    };
   }
 
   async remove(id: string): Promise<void> {
@@ -52,7 +74,7 @@ export class ResourcesService {
     }
   }
 
-  async addUrlResource(addUrlResourceDto: AddUrlResourceDto): Promise<Resource> {
+  async addUrlResource(addUrlResourceDto: AddUrlResourceDto): Promise<any> {
     const companyExists = await this.companiesService.exists(addUrlResourceDto.companyId);
     if (!companyExists) {
       throw new NotFoundException(`Company with ID ${addUrlResourceDto.companyId} not found`);
@@ -77,13 +99,18 @@ export class ResourcesService {
       .getCollection<Resource>('resources')
       .insertOne(resource);
 
-    return { ...resource, _id: result.insertedId };
+    return {
+      ...resource,
+      id: result.insertedId.toString(),
+      _id: result.insertedId.toString(),
+      companyId: addUrlResourceDto.companyId,
+    };
   }
 
   async uploadFile(
     file: Express.Multer.File,
     uploadDto: UploadResourceDto,
-  ): Promise<Resource> {
+  ): Promise<any> {
     const companyExists = await this.companiesService.exists(uploadDto.companyId);
     if (!companyExists) {
       throw new NotFoundException(`Company with ID ${uploadDto.companyId} not found`);
@@ -105,7 +132,14 @@ export class ResourcesService {
       .getCollection<Resource>('resources')
       .insertOne(resource);
 
-    return { ...resource, _id: result.insertedId };
+    const { fileData, ...resourceWithoutBuffer } = resource;
+    return {
+      ...resourceWithoutBuffer,
+      id: result.insertedId.toString(),
+      _id: result.insertedId.toString(),
+      companyId: uploadDto.companyId,
+      fileUrl: `/uploads/${result.insertedId}`,
+    };
   }
 }
 
