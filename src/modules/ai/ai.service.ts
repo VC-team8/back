@@ -152,6 +152,16 @@ export class AiService implements OnModuleInit {
     console.log(`Top chunk scores: ${relevantChunks.map(c => c.score).join(', ')}`);
     const context = relevantChunks.map(chunk => chunk.chunkText).join('\n\n---\n\n');
 
+    // Fetch resource details for each unique resourceId
+    const uniqueResourceIds = [...new Set(relevantChunks.map(chunk => chunk.resourceId.toString()))];
+    const resourcesCollection = this.databaseService.getCollection('resources');
+    const resources = await resourcesCollection.find({
+      _id: { $in: uniqueResourceIds.map(id => new ObjectId(id)) }
+    }).toArray();
+
+    // Create a map for quick lookup
+    const resourceMap = new Map(resources.map(r => [r._id.toString(), r]));
+
     // Generate the final answer with Claude 4.5
     try {
       const response = await this.anthropic.messages.create({
@@ -170,10 +180,22 @@ export class AiService implements OnModuleInit {
 
       return {
         content,
-        sources: relevantChunks.map(chunk => ({
-          score: chunk.score,
-          text: chunk.chunkText.substring(0, 200) + '...',
-        })),
+        sources: relevantChunks.map(chunk => {
+          const resource = resourceMap.get(chunk.resourceId.toString());
+          return {
+            score: chunk.score,
+            text: chunk.chunkText.substring(0, 200) + '...',
+            resourceId: chunk.resourceId.toString(),
+            resource: resource ? {
+              id: resource._id.toString(),
+              type: resource.type,
+              title: resource.title,
+              fileName: resource.fileName,
+              fileUrl: resource.fileUrl,
+              url: resource.url,
+            } : null,
+          };
+        }),
       };
     } catch (error) {
       console.error('Error calling Anthropic API:', error);
@@ -207,11 +229,9 @@ export class AiService implements OnModuleInit {
           queryVector: queryEmbedding,
           numCandidates: 150,
           limit: 5,
-        },
-      },
-      {
-        $match: {
-          companyId: new ObjectId(companyId),
+          filter: {
+            companyId: new ObjectId(companyId),
+          },
         },
       },
       {
@@ -220,6 +240,7 @@ export class AiService implements OnModuleInit {
           chunkText: 1,
           score: { $meta: 'vectorSearchScore' },
           companyId: 1,
+          resourceId: 1,
         },
       },
     ];
