@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { EmployeesService } from './employees.service';
-import { CreateEmployeeDto, CreateEmployeeEmailDto } from './dto/create-employee.dto';
+import { CreateEmployeeDto, CreateEmployeeEmailDto, LoginEmployeeDto } from './dto/create-employee.dto';
 import { IEmployee, IEmployeeEmail } from './employee.interface';
 
 @ApiTags('Employees')
@@ -28,6 +28,16 @@ export class EmployeesController {
     @Body() createEmployeeDto: CreateEmployeeDto,
   ): Promise<Omit<IEmployee, 'password'> & { access_token: string }> {
     return this.employeesService.create(createEmployeeDto);
+  }
+
+  @Post('login')
+  @ApiOperation({ summary: 'Employee login' })
+  @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  async login(
+    @Body() loginDto: LoginEmployeeDto,
+  ): Promise<Omit<IEmployee, 'password'> & { access_token: string }> {
+    return this.employeesService.login(loginDto);
   }
 
   @Post('create-email')

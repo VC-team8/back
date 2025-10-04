@@ -33,3 +33,15 @@ export class CreateCompanyDto {
   @IsOptional()
   password?: string;
 }
+
+export class LoginCompanyDto {
+  @ApiProperty({ example: 'admin@company.com', description: 'Company contact email' })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty({ example: 'password123', description: 'Company password' })
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+}

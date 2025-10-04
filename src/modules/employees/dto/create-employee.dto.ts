@@ -64,3 +64,15 @@ export class CreateEmployeeEmailDto {
   password: string;
 }
 
+export class LoginEmployeeDto {
+  @ApiProperty({ example: 'john.smith@example.com', description: 'Employee email' })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty({ example: 'password123', description: 'Employee password' })
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+}
+

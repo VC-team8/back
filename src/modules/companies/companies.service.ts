@@ -1,13 +1,43 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ObjectId } from 'mongodb';
 import { DatabaseService } from '../../database/database.service';
 import { Company } from './company.interface';
-import { CreateCompanyDto } from './dto/create-company.dto';
+import { CreateCompanyDto, LoginCompanyDto } from './dto/create-company.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class CompaniesService {
   constructor(private readonly db: DatabaseService) {}
+
+  async login(loginDto: LoginCompanyDto): Promise<any> {
+    // Find company by email
+    const company = await this.db
+      .getCollection<Company>('companies')
+      .findOne({ email: loginDto.email });
+
+    if (!company) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Verify password
+    if (!company.password) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    const isPasswordValid = await bcrypt.compare(loginDto.password, company.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Remove password from response and add id field
+    const { password, ...companyWithoutPassword } = company as any;
+
+    return {
+      ...companyWithoutPassword,
+      id: company._id.toString(),
+      _id: company._id.toString(),
+    };
+  }
 
   async create(createCompanyDto: CreateCompanyDto): Promise<any> {
     const hashedPassword = createCompanyDto.password

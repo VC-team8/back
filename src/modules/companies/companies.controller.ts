@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { CompaniesService } from './companies.service';
-import { CreateCompanyDto } from './dto/create-company.dto';
+import { CreateCompanyDto, LoginCompanyDto } from './dto/create-company.dto';
 import { Company } from './company.interface';
 
 @ApiTags('Companies')
@@ -27,6 +27,14 @@ export class CompaniesController {
   @ApiResponse({ status: 409, description: 'Email already exists' })
   async create(@Body() createCompanyDto: CreateCompanyDto): Promise<Company> {
     return this.companiesService.create(createCompanyDto);
+  }
+
+  @Post('login')
+  @ApiOperation({ summary: 'Company login' })
+  @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  async login(@Body() loginDto: LoginCompanyDto): Promise<Omit<Company, 'password'>> {
+    return this.companiesService.login(loginDto);
   }
 
   @Get()

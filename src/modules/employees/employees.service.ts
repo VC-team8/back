@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { ObjectId } from 'mongodb';
 import { DatabaseService } from '../../database/database.service';
-import { CreateEmployeeDto, CreateEmployeeEmailDto } from './dto/create-employee.dto';
+import { CreateEmployeeDto, CreateEmployeeEmailDto, LoginEmployeeDto } from './dto/create-employee.dto';
 import { IEmployee, IEmployeeEmail } from './employee.interface';
 import * as bcrypt from 'bcrypt';
 
@@ -76,6 +76,37 @@ export class EmployeesService {
       ...employeeWithoutPassword,
       id: result.insertedId.toString(),
       _id: result.insertedId.toString(),
+      access_token,
+    };
+  }
+
+  async login(loginDto: LoginEmployeeDto): Promise<any> {
+    // Find employee by email
+    const employee = await this.db
+      .getCollection<IEmployee>('employees')
+      .findOne({ email: loginDto.email });
+
+    if (!employee) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(loginDto.password, employee.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Generate mock access token (in real app, use JWT)
+    const access_token = `mock_token_${employee._id}`;
+
+    // Remove password from response and add id field
+    const { password, ...employeeWithoutPassword } = employee as any;
+
+    return {
+      ...employeeWithoutPassword,
+      id: employee._id.toString(),
+      _id: employee._id.toString(),
+      companyId: employee.companyId,
       access_token,
     };
   }
