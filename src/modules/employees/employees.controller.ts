@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
@@ -10,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { EmployeesService } from './employees.service';
-import { CreateEmployeeDto, CreateEmployeeEmailDto, LoginEmployeeDto } from './dto/create-employee.dto';
+import { CreateEmployeeDto, CreateEmployeeEmailDto, LoginEmployeeDto, UpdateEmployeeDto } from './dto/create-employee.dto';
 import { IEmployee, IEmployeeEmail } from './employee.interface';
 
 @ApiTags('Employees')
@@ -78,6 +79,18 @@ export class EmployeesController {
   @ApiResponse({ status: 404, description: 'Employee not found' })
   async findById(@Param('id') id: string): Promise<Omit<IEmployee, 'password'>> {
     return this.employeesService.findById(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update employee profile' })
+  @ApiParam({ name: 'id', description: 'Employee ID' })
+  @ApiResponse({ status: 200, description: 'Employee updated successfully' })
+  @ApiResponse({ status: 404, description: 'Employee not found' })
+  async update(
+    @Param('id') id: string,
+    @Body() updateEmployeeDto: UpdateEmployeeDto,
+  ): Promise<Omit<IEmployee, 'password'>> {
+    return this.employeesService.update(id, updateEmployeeDto);
   }
 
   @Delete(':id')

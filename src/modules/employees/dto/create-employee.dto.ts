@@ -76,3 +76,32 @@ export class LoginEmployeeDto {
   password: string;
 }
 
+export class UpdateEmployeeDto {
+  @ApiPropertyOptional({ example: 'John Smith', description: 'Employee full name' })
+  @IsString()
+  @IsOptional()
+  @MinLength(2)
+  name?: string;
+
+  @ApiPropertyOptional({ example: 'engineering', description: 'Department' })
+  @IsString()
+  @IsOptional()
+  department?: string;
+
+  @ApiPropertyOptional({
+    example: {
+      roles: ['developer', 'team-lead'],
+      skills: ['javascript', 'react'],
+      interests: ['ai', 'web-development']
+    },
+    description: 'Employee tags'
+  })
+  @IsOptional()
+  @IsObject()
+  tags?: {
+    roles?: string[];
+    skills?: string[];
+    interests?: string[];
+  };
+}
+

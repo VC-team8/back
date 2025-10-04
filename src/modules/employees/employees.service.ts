@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { ObjectId } from 'mongodb';
 import { DatabaseService } from '../../database/database.service';
-import { CreateEmployeeDto, CreateEmployeeEmailDto, LoginEmployeeDto } from './dto/create-employee.dto';
+import { CreateEmployeeDto, CreateEmployeeEmailDto, LoginEmployeeDto, UpdateEmployeeDto } from './dto/create-employee.dto';
 import { IEmployee, IEmployeeEmail } from './employee.interface';
 import * as bcrypt from 'bcrypt';
 
@@ -199,6 +199,36 @@ export class EmployeesService {
       ...employee,
       id: employee._id.toString(),
       _id: employee._id.toString(),
+    };
+  }
+
+  async update(id: string, updateEmployeeDto: UpdateEmployeeDto): Promise<any> {
+    // Validate ObjectId format
+    if (!ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid employee ID format');
+    }
+
+    const updateData: any = {
+      ...updateEmployeeDto,
+      updatedAt: new Date(),
+    };
+
+    const result = await this.db
+      .getCollection<IEmployee>('employees')
+      .findOneAndUpdate(
+        { _id: new ObjectId(id) } as any,
+        { $set: updateData },
+        { returnDocument: 'after', projection: { password: 0 } }
+      );
+
+    if (!result) {
+      throw new NotFoundException('Employee not found');
+    }
+
+    return {
+      ...result,
+      id: result._id.toString(),
+      _id: result._id.toString(),
     };
   }
 
