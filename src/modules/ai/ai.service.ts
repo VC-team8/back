@@ -106,11 +106,13 @@ export class AiService implements OnModuleInit {
     // Prepare documents for MongoDB
     const chunksToSave = textChunks.map((chunk, i) => ({
       resourceId: new ObjectId(resourceId),
-      companyId: resource.companyId,
+      companyId: new ObjectId(resource.companyId),
       chunkText: chunk,
       embedding: embeddings[i],
       createdAt: new Date(),
     }));
+
+    console.log(`Saving chunks with companyId: ${resource.companyId} (converted to ObjectId)`);
 
     // Save chunks to the database
     await this.chunksCollection.insertMany(chunksToSave);
@@ -130,17 +132,24 @@ export class AiService implements OnModuleInit {
 
     // Generate an embedding for the user's query
     const queryEmbedding = (await this.generateEmbeddings([query]))[0];
+    console.log(`Generated query embedding with ${queryEmbedding.length} dimensions`);
 
     // Find relevant document chunks using Atlas Vector Search
     const relevantChunks = await this.findRelevantChunks(queryEmbedding, companyId);
+    console.log(`Vector search returned ${relevantChunks.length} chunks`);
 
     if (relevantChunks.length === 0) {
+      // Debug: Check if there are any chunks for this company
+      const totalChunks = await this.chunksCollection.countDocuments({ companyId: new ObjectId(companyId) });
+      console.log(`Total chunks in database for company ${companyId}: ${totalChunks}`);
+
       return {
         content: "I'm sorry, but I couldn't find any relevant information in the company documents to answer your question.",
         sources: [],
       };
     }
 
+    console.log(`Top chunk scores: ${relevantChunks.map(c => c.score).join(', ')}`);
     const context = relevantChunks.map(chunk => chunk.chunkText).join('\n\n---\n\n');
 
     // Generate the final answer with Claude 4.5
@@ -187,6 +196,9 @@ export class AiService implements OnModuleInit {
    * Uses MongoDB Atlas Vector Search to find relevant chunks
    */
   private async findRelevantChunks(queryEmbedding: number[], companyId: string) {
+    console.log(`[Vector Search] Searching for company: ${companyId}`);
+    console.log(`[Vector Search] Query vector dimensions: ${queryEmbedding.length}`);
+
     const pipeline = [
       {
         $vectorSearch: {
@@ -207,11 +219,20 @@ export class AiService implements OnModuleInit {
           _id: 0,
           chunkText: 1,
           score: { $meta: 'vectorSearchScore' },
+          companyId: 1,
         },
       },
     ];
 
+    console.log(`[Vector Search] Running aggregation pipeline...`);
     const results = await this.chunksCollection.aggregate(pipeline).toArray();
+    console.log(`[Vector Search] Raw results count: ${results.length}`);
+
+    if (results.length > 0) {
+      console.log(`[Vector Search] First result company: ${results[0].companyId}, score: ${results[0].score}`);
+      console.log(`[Vector Search] First result preview: ${results[0].chunkText.substring(0, 100)}...`);
+    }
+
     return results;
   }
 
