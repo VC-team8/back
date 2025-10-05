@@ -16,7 +16,7 @@ Backend API for AI-powered employee onboarding platform built with Nest.js, Type
 
 - **Framework**: Nest.js
 - **Language**: TypeScript
-- **Database**: MongoDB with Mongoose
+- **Database**: MongoDB Atlas (native driver)
 - **Documentation**: Swagger/OpenAPI
 - **File Upload**: Multer
 - **Validation**: class-validator, class-transformer
@@ -25,48 +25,40 @@ Backend API for AI-powered employee onboarding platform built with Nest.js, Type
 
 1. Install dependencies:
 ```bash
-npm install
+pnpm install
 ```
 
 2. Set up environment variables:
-```bash
-# Copy the example file
-cp .env.example .env
 
-# Edit the .env file with your configuration
-```
-
-3. Start MongoDB (make sure MongoDB is running on your system)
-
-4. Run the application:
-```bash
-# Development
-npm run start:dev
-
-# Production
-npm run build
-npm run start:prod
-```
-
-## Environment Variables
+Create a `.env` file with your MongoDB Atlas connection string:
 
 ```env
-# Database
-MONGODB_URI=mongodb://localhost:27017/onboard-ai
+# MongoDB Atlas Connection
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/onboard-ai?retryWrites=true&w=majority
 
 # Server
 PORT=8000
 NODE_ENV=development
 
 # CORS
-CORS_ORIGIN=http://localhost:3000
+FRONTEND_URL=http://localhost:3000
 
 # File Upload
 MAX_FILE_SIZE=10485760
 UPLOAD_PATH=./uploads
 
-# AI Integration
-OPENAI_API_KEY=your-openai-api-key-here
+# AI Integration (optional)
+OPENAI_API_KEY=
+```
+
+3. Run the application:
+```bash
+# Development
+pnpm run start:dev
+
+# Production
+pnpm run build
+pnpm run start:prod
 ```
 
 ## API Documentation

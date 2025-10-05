@@ -1,15 +1,11 @@
-import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
+import { Module, forwardRef } from '@nestjs/common';
 import { ResourcesService } from './resources.service';
 import { ResourcesController } from './resources.controller';
-import { Resource, ResourceSchema } from './resource.schema';
 import { CompaniesModule } from '../companies/companies.module';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([{ name: Resource.name, schema: ResourceSchema }]),
-    CompaniesModule,
-  ],
+  imports: [CompaniesModule, forwardRef(() => AiModule)],
   controllers: [ResourcesController],
   providers: [ResourcesService],
   exports: [ResourcesService],
