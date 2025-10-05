@@ -24,6 +24,7 @@ export class ResourcesService {
       _id: res._id.toString(),
       companyId: res.companyId.toString(),
       fileData: undefined, // Don't send binary data in list
+      fileUrl: res.type === 'file' ? `http://localhost:8000/api/resources/${res._id.toString()}/download` : undefined,
     }));
   }
 
@@ -44,6 +45,7 @@ export class ResourcesService {
       _id: res._id.toString(),
       companyId: companyId,
       fileData: undefined, // Don't send binary data in list
+      fileUrl: res.type === 'file' ? `http://localhost:8000/api/resources/${res._id.toString()}/download` : undefined,
     }));
   }
 
@@ -138,7 +140,7 @@ export class ResourcesService {
       id: result.insertedId.toString(),
       _id: result.insertedId.toString(),
       companyId: uploadDto.companyId,
-      fileUrl: `/uploads/${result.insertedId}`,
+      fileUrl: `http://localhost:8000/api/resources/${result.insertedId.toString()}/download`,
     };
   }
 }

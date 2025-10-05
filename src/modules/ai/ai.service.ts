@@ -153,7 +153,7 @@ export class AiService implements OnModuleInit {
     const context = relevantChunks.map(chunk => chunk.chunkText).join('\n\n---\n\n');
 
     // Fetch resource details for each unique resourceId
-    const uniqueResourceIds = [...new Set(relevantChunks.map(chunk => chunk.resourceId.toString()))];
+    const uniqueResourceIds = [...new Set(relevantChunks.map(chunk => chunk.resourceId.toString()))] as string[];
     const resourcesCollection = this.databaseService.getCollection('resources');
     const resources = await resourcesCollection.find({
       _id: { $in: uniqueResourceIds.map(id => new ObjectId(id)) }
