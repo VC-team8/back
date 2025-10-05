@@ -667,24 +667,36 @@ Answer in a natural, conversational way as if you're an expert on this company's
 
       const content = response.content[0].type === 'text' ? response.content[0].text : '';
 
+      // Deduplicate sources by resourceId to avoid showing same document multiple times
+      const uniqueSources = new Map<string, any>();
+      
+      for (const chunk of relevantChunks) {
+        const resourceId = chunk.resourceId.toString();
+        const resource = resourceMap.get(resourceId);
+        
+        // Skip if we already have this resource or if resource not found
+        if (!resource || uniqueSources.has(resourceId)) {
+          continue;
+        }
+        
+        uniqueSources.set(resourceId, {
+          score: chunk.score,
+          text: chunk.chunkText.substring(0, 200) + '...',
+          resourceId: resourceId,
+          resource: {
+            id: resource._id.toString(),
+            type: resource.type,
+            title: resource.title,
+            fileName: resource.fileName,
+            fileUrl: resource.fileUrl,
+            url: resource.url,
+          },
+        });
+      }
+
       const result = {
         content,
-        sources: relevantChunks.map(chunk => {
-          const resource = resourceMap.get(chunk.resourceId.toString());
-          return {
-            score: chunk.score,
-            text: chunk.chunkText.substring(0, 200) + '...',
-            resourceId: chunk.resourceId.toString(),
-            resource: resource ? {
-              id: resource._id.toString(),
-              type: resource.type,
-              title: resource.title,
-              fileName: resource.fileName,
-              fileUrl: resource.fileUrl,
-              url: resource.url,
-            } : null,
-          };
-        })
+        sources: Array.from(uniqueSources.values())
       };
 
       // Cache the response (async, non-blocking)
