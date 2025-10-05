@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ResourcesService } from '../resources/resources.service';
 import { DatabaseService } from '../../database/database.service';
+import { CacheService } from '../cache/cache.service';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
@@ -45,6 +46,7 @@ export class AiService implements OnModuleInit {
   constructor(
     private resourcesService: ResourcesService,
     private databaseService: DatabaseService,
+    private cacheService: CacheService,
   ) {
     this.anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -539,6 +541,21 @@ export class AiService implements OnModuleInit {
   async generateResponse(query: string, companyId: string): Promise<{ content: string; sources: any[] }> {
     console.log(`Generating AI response for query: "${query}" for company: ${companyId}`);
 
+    // Track query frequency (async, non-blocking)
+    this.cacheService.trackQuery(query, companyId).catch(err =>
+      console.error('Error tracking query:', err)
+    );
+
+    // Check cache first
+    const cachedResponse = await this.cacheService.getCachedResponse(query, companyId);
+    if (cachedResponse) {
+      console.log('Returning cached response');
+      return {
+        content: cachedResponse.content,
+        sources: cachedResponse.sources,
+      };
+    }
+
     // Step 1: Expand query with related terms to improve recall
     const expandedQueries = await this.expandQuery(query);
     console.log(`Expanded query into ${expandedQueries.length} variations`);
@@ -650,26 +667,14 @@ Answer in a natural, conversational way as if you're an expert on this company's
 
       const content = response.content[0].type === 'text' ? response.content[0].text : '';
 
-      // Group chunks by resource (1 excerpt per document)
-      const sourcesByResource = new Map<string, {
-        resourceId: string;
-        texts: string[];
-        scores: number[];
-        resource: any;
-      }>();
-
-      for (const chunk of relevantChunks) {
-        const resourceIdStr = chunk.resourceId.toString();
-        const existing = sourcesByResource.get(resourceIdStr);
-        if (existing) {
-          existing.texts.push(chunk.chunkText);
-          existing.scores.push(chunk.score);
-        } else {
-          const resource = resourceMap.get(resourceIdStr);
-          sourcesByResource.set(resourceIdStr, {
-            resourceId: resourceIdStr,
-            texts: [chunk.chunkText],
-            scores: [chunk.score],
+      const result = {
+        content,
+        sources: relevantChunks.map(chunk => {
+          const resource = resourceMap.get(chunk.resourceId.toString());
+          return {
+            score: chunk.score,
+            text: chunk.chunkText.substring(0, 200) + '...',
+            resourceId: chunk.resourceId.toString(),
             resource: resource ? {
               id: resource._id.toString(),
               type: resource.type,
@@ -678,23 +683,16 @@ Answer in a natural, conversational way as if you're an expert on this company's
               fileUrl: resource.fileUrl,
               url: resource.url,
             } : null,
-          });
-        }
-      }
-
-      // Format sources: 1 combined excerpt per document
-      const sources = Array.from(sourcesByResource.values()).map((source) => ({
-        resourceId: source.resourceId,
-        text: source.texts.join('\n\n...\n\n'), // Combine all chunks from this document
-        excerpt: source.texts[0].slice(0, 250) + (source.texts[0].length > 250 ? '...' : ''), // Short preview
-        score: Math.max(...source.scores), // Best score from this resource
-        resource: source.resource,
-      }));
-
-      return {
-        content,
-        sources,
+          };
+        })
       };
+
+      // Cache the response (async, non-blocking)
+      this.cacheService.cacheResponse(query, companyId, result).catch(err =>
+        console.error('Error caching response:', err)
+      );
+
+      return result;
     } catch (error) {
       console.error('Error calling Anthropic API:', error);
       throw new Error('Failed to generate AI response.');
