@@ -13,4 +13,15 @@ export interface Resource {
   fileSize?: number;
   tags: string[];
   createdAt: Date;
+  
+  // URL as virtual file fields
+  extractedContent?: string;
+  extractedAt?: Date;
+  contentLength?: number;
+  originalUrl?: string;
+  
+  // Processing status
+  processed?: boolean;
+  processedAt?: Date;
+  processingError?: string;
 }
