@@ -717,6 +717,8 @@ JWT_SECRET=your-secret-key
 MAX_FILE_SIZE=10485760
 UPLOAD_PATH=./uploads
 OPENAI_API_KEY=sk-... (for AI chat)
+ANTHROPIC_API_KEY=sk-ant-... (for Claude 4.5)
+REDIS_URL=redis://localhost:6379 (for caching)
 ```
 
 ---

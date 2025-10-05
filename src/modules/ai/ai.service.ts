@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ResourcesService } from '../resources/resources.service';
 import { DatabaseService } from '../../database/database.service';
+import { CacheService } from '../cache/cache.service';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
@@ -37,6 +38,7 @@ export class AiService implements OnModuleInit {
   constructor(
     private resourcesService: ResourcesService,
     private databaseService: DatabaseService,
+    private cacheService: CacheService,
   ) {
     this.anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -130,6 +132,21 @@ export class AiService implements OnModuleInit {
   async generateResponse(query: string, companyId: string): Promise<{ content: string; sources: any[] }> {
     console.log(`Generating AI response for query: "${query}" for company: ${companyId}`);
 
+    // Track query frequency (async, non-blocking)
+    this.cacheService.trackQuery(query, companyId).catch(err =>
+      console.error('Error tracking query:', err)
+    );
+
+    // Check cache first
+    const cachedResponse = await this.cacheService.getCachedResponse(query, companyId);
+    if (cachedResponse) {
+      console.log('Returning cached response');
+      return {
+        content: cachedResponse.content,
+        sources: cachedResponse.sources,
+      };
+    }
+
     // Generate an embedding for the user's query
     const queryEmbedding = (await this.generateEmbeddings([query]))[0];
     console.log(`Generated query embedding with ${queryEmbedding.length} dimensions`);
@@ -178,7 +195,7 @@ export class AiService implements OnModuleInit {
 
       const content = response.content[0].type === 'text' ? response.content[0].text : '';
 
-      return {
+      const result = {
         content,
         sources: relevantChunks.map(chunk => {
           const resource = resourceMap.get(chunk.resourceId.toString());
@@ -197,6 +214,13 @@ export class AiService implements OnModuleInit {
           };
         }),
       };
+
+      // Cache the response (async, non-blocking)
+      this.cacheService.cacheResponse(query, companyId, result).catch(err =>
+        console.error('Error caching response:', err)
+      );
+
+      return result;
     } catch (error) {
       console.error('Error calling Anthropic API:', error);
       throw new Error('Failed to generate AI response.');
