@@ -98,7 +98,14 @@ export class ResourcesController {
   @ApiResponse({ status: 400, description: 'Invalid URL or input data' })
   @ApiResponse({ status: 404, description: 'Company not found' })
   async addUrl(@Body() addUrlResourceDto: AddUrlResourceDto): Promise<Resource> {
-    return this.resourcesService.addUrlResource(addUrlResourceDto);
+    const resource = await this.resourcesService.addUrlResource(addUrlResourceDto);
+    
+    // Automatically process URL for embeddings (async, fire-and-forget)
+    this.aiService.processUrl(resource.id).catch(err => {
+      console.error(`Failed to process URL ${resource.id}:`, err);
+    });
+    
+    return resource;
   }
 
   @Get()
@@ -155,5 +162,28 @@ export class ResourcesController {
     });
 
     res.send(resource.fileData);
+  }
+
+  @Get(':id/extracted-content')
+  @ApiOperation({ summary: 'Get extracted and cleaned content from URL resource' })
+  @ApiParam({ name: 'id', description: 'Resource ID' })
+  @ApiResponse({ status: 200, description: 'Extracted content retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Resource not found or not a URL, or content not yet extracted' })
+  async getExtractedContent(@Param('id') id: string): Promise<{ content: string; contentLength: number; extractedAt: Date }> {
+    const resource = await this.resourcesService.findOne(id);
+
+    if (resource.type !== 'url') {
+      throw new BadRequestException('Resource is not a URL');
+    }
+
+    if (!resource.extractedContent) {
+      throw new BadRequestException('Content has not been extracted yet. Please wait for processing to complete.');
+    }
+
+    return {
+      content: resource.extractedContent,
+      contentLength: resource.contentLength || resource.extractedContent.length,
+      extractedAt: resource.extractedAt,
+    };
   }
 }
