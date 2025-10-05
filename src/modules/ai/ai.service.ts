@@ -818,5 +818,230 @@ Answer in a natural, conversational way as if you're an expert on this company's
       };
     }
   }
+
+  /**
+   * Generate personalized welcome message based on employee profile
+   */
+  async generateWelcomeMessage(data: {
+    companyId: string;
+    employeeName?: string;
+    department?: string;
+    tags?: {
+      roles?: string[];
+      skills?: string[];
+      interests?: string[];
+    };
+  }): Promise<{ content: string; sources: any[] }> {
+    console.log(`Generating personalized welcome message for company: ${data.companyId}`);
+
+    // Build a query based on employee profile
+    let query = 'Welcome! Give me a personalized introduction to the company';
+    
+    if (data.tags) {
+      const { roles, skills, interests } = data.tags;
+      const tagParts: string[] = [];
+      
+      if (roles && roles.length > 0) {
+        tagParts.push(`my role is ${roles.join(', ')}`);
+      }
+      if (skills && skills.length > 0) {
+        tagParts.push(`my skills include ${skills.join(', ')}`);
+      }
+      if (interests && interests.length > 0) {
+        tagParts.push(`I'm interested in ${interests.join(', ')}`);
+      }
+      
+      if (tagParts.length > 0) {
+        query += `. Here's my profile: ${tagParts.join('; ')}.`;
+      }
+    }
+
+    if (data.department) {
+      query += ` I'm in the ${data.department} department.`;
+    }
+
+    query += ' Please provide relevant information, resources, and guidance specific to my profile.';
+
+    console.log(`Welcome query: ${query}`);
+
+    // Use the standard generateResponse method with custom system prompt
+    const WELCOME_SYSTEM_PROMPT = `You are OnboardAI, a friendly and professional onboarding assistant. You are welcoming a new employee to the company.
+
+Your task is to provide a warm, personalized welcome message that:
+1. Greets the employee warmly
+2. Provides an overview of key information relevant to their role, skills, and interests
+3. Highlights the most important resources and documents they should review
+4. Offers guidance on what they should focus on during their first days
+5. Maintains an encouraging and supportive tone
+
+Use the provided context from company documents to give specific, actionable information. Make the welcome message concise but informative (aim for 3-5 paragraphs).`;
+
+    // Temporarily override system prompt
+    const originalSystemPrompt = SYSTEM_PROMPT;
+    
+    try {
+      // Generate embeddings for the welcome query
+      const expandedQueries = await this.expandQuery(query);
+      const queryEmbeddings = await this.generateEmbeddings(expandedQueries);
+
+      // Search with multiple embeddings
+      const allChunks = new Map<string, any>();
+      
+      for (let i = 0; i < queryEmbeddings.length; i++) {
+        const chunks = await this.findRelevantChunks(queryEmbeddings[i], data.companyId, 10);
+        chunks.forEach(chunk => {
+          const chunkId = `${chunk.resourceId}-${chunk.chunkText.substring(0, 50)}`;
+          if (!allChunks.has(chunkId) || allChunks.get(chunkId).score < chunk.score) {
+            allChunks.set(chunkId, chunk);
+          }
+        });
+      }
+
+      const relevantChunks = Array.from(allChunks.values())
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 15);
+
+      console.log(`Found ${relevantChunks.length} relevant chunks for welcome message`);
+
+      // If no chunks found, provide a generic welcome
+      if (relevantChunks.length === 0) {
+        const genericWelcome = this.generateGenericWelcome(data);
+        return {
+          content: genericWelcome,
+          sources: [],
+        };
+      }
+
+      // Fetch resource details
+      const uniqueResourceIds = [...new Set(relevantChunks.map(chunk => chunk.resourceId.toString()))];
+      const resourcesCollection = this.databaseService.getCollection('resources');
+      const resources = await resourcesCollection.find({
+        _id: { $in: uniqueResourceIds.map(id => new ObjectId(id)) }
+      }).toArray();
+
+      const resourceMap = new Map(resources.map(r => [r._id.toString(), r]));
+
+      const context = relevantChunks.map(chunk => chunk.chunkText).join('\n\n---\n\n');
+
+      // Get unique resource titles
+      const resourceTitles = uniqueResourceIds
+        .map(id => {
+          const resource = resourceMap.get(id);
+          return resource ? `- ${resource.title} (${resource.type})` : '';
+        })
+        .filter(t => t)
+        .join('\n');
+
+      // Generate welcome message with Claude
+      const response = await this.anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        system: WELCOME_SYSTEM_PROMPT,
+        max_tokens: 2000,
+        messages: [
+          {
+            role: 'user',
+            content: `I'm creating a personalized welcome message for a new employee.
+
+Employee Profile:
+- Name: ${data.employeeName || 'New Employee'}
+- Department: ${data.department || 'Not specified'}
+- Roles: ${data.tags?.roles?.join(', ') || 'Not specified'}
+- Skills: ${data.tags?.skills?.join(', ') || 'Not specified'}
+- Interests: ${data.tags?.interests?.join(', ') || 'Not specified'}
+
+Available company resources:
+${resourceTitles}
+
+Relevant content from company documents:
+${context}
+
+Please create a warm, personalized welcome message that highlights the most relevant information for this employee based on their profile. Make it friendly, encouraging, and actionable.`,
+          },
+        ],
+      });
+
+      const content = response.content[0].type === 'text' ? response.content[0].text : '';
+
+      // Deduplicate sources
+      const uniqueSources = new Map<string, any>();
+      
+      for (const chunk of relevantChunks) {
+        const resourceId = chunk.resourceId.toString();
+        const resource = resourceMap.get(resourceId);
+        
+        if (!resource || uniqueSources.has(resourceId)) {
+          continue;
+        }
+        
+        uniqueSources.set(resourceId, {
+          score: chunk.score,
+          text: chunk.chunkText.substring(0, 200) + '...',
+          resourceId: resourceId,
+          resource: {
+            id: resource._id.toString(),
+            type: resource.type,
+            title: resource.title,
+            fileName: resource.fileName,
+            fileUrl: resource.fileUrl,
+            url: resource.url,
+          },
+        });
+      }
+
+      return {
+        content,
+        sources: Array.from(uniqueSources.values())
+      };
+
+    } catch (error) {
+      console.error('Error generating welcome message:', error);
+      // Fallback to generic welcome
+      return {
+        content: this.generateGenericWelcome(data),
+        sources: [],
+      };
+    }
+  }
+
+  /**
+   * Generate a generic welcome message when no resources are available
+   */
+  private generateGenericWelcome(data: {
+    employeeName?: string;
+    department?: string;
+    tags?: {
+      roles?: string[];
+      skills?: string[];
+      interests?: string[];
+    };
+  }): string {
+    const name = data.employeeName || 'there';
+    const dept = data.department ? ` in the ${data.department} department` : '';
+    
+    let message = `# Welcome to the team, ${name}! 👋\n\n`;
+    message += `I'm OnboardAI, your personal onboarding assistant. I'm here to help you get acquainted with the company${dept}.\n\n`;
+    
+    if (data.tags) {
+      const { roles, skills, interests } = data.tags;
+      if (roles && roles.length > 0) {
+        message += `I see you'll be working as ${roles.join(', ')}. `;
+      }
+      if (skills && skills.length > 0) {
+        message += `With your skills in ${skills.join(', ')}, you'll fit right in! `;
+      }
+      if (interests && interests.length > 0) {
+        message += `I also noticed you're interested in ${interests.join(', ')} - that's great!\n\n`;
+      }
+    }
+    
+    message += `## How I Can Help\n\n`;
+    message += `- **Ask me anything** about the company, policies, or procedures\n`;
+    message += `- **Find resources** quickly by asking for specific documents or information\n`;
+    message += `- **Get guidance** on your onboarding process and next steps\n\n`;
+    message += `To get started, your company administrator needs to upload some resources and documents. Once that's done, I'll be able to provide you with detailed, specific information about your role and the company.\n\n`;
+    message += `In the meantime, feel free to ask me anything - I'll do my best to help!`;
+    
+    return message;
+  }
 }
 

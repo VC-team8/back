@@ -50,6 +50,24 @@ export class AiController {
     return this.aiService.generateResponse(body.query, body.companyId);
   }
 
+  @Post('welcome')
+  @ApiOperation({ summary: 'Generate personalized welcome message based on employee profile' })
+  @ApiResponse({ status: 200, description: 'Personalized welcome message generated' })
+  async generateWelcomeMessage(
+    @Body() body: { 
+      companyId: string; 
+      employeeName?: string;
+      department?: string;
+      tags?: {
+        roles?: string[];
+        skills?: string[];
+        interests?: string[];
+      };
+    },
+  ): Promise<{ content: string; sources: any[] }> {
+    return this.aiService.generateWelcomeMessage(body);
+  }
+
   @Post('status')
   @ApiOperation({ summary: 'Get AI service status' })
   @ApiResponse({ status: 200, description: 'AI service status' })
